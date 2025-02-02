@@ -1,48 +1,65 @@
 import { randomUUID } from 'crypto';
 import { IReceipt } from '../interfaces/receipt.interface';
 
-// In-memory store: receiptId -> { receipt, points }
+/**
+ * In-memory store:
+ *   receiptId -> { receipt, points }
+ */
 const receiptStore = new Map<string, { receipt: IReceipt; points: number }>();
 
+/**
+ * Calculates the total points for a given receipt.
+ *   1) +1 point for every alphanumeric char in the retailer name.
+ *   2) +50 if the total is a whole number.
+ *   3) +25 if the total is a multiple of 0.25.
+ *   4) +5 for every 2 items.
+ *   5) If trimmed item desc length is multiple of 3 => ceil(price * 0.2).
+ *   6) +6 if purchase day is odd.
+ *   7) +10 if purchase time (hour) is between 14..15 (2pm-3:59pm).
+ */
 export function calculatePoints(receipt: IReceipt): number {
   let points = 0;
 
+  // 1) Count alphanumeric characters in retailer name
   const alphanumericMatches = receipt.retailer.match(/[a-zA-Z0-9]/g);
-  points += alphanumericMatches ? alphanumericMatches.length : 0;
+  if (alphanumericMatches) {
+    points += alphanumericMatches.length;
+  }
 
   const totalAmount = parseFloat(receipt.total);
 
-  if (totalAmount % 1 === 0) {
+  // 2) +50 if total is a whole number
+  if (Number.isInteger(totalAmount)) {
     points += 50;
   }
 
+  // 3) +25 if total is a multiple of 0.25
   if ((totalAmount * 100) % 25 === 0) {
     points += 25;
   }
 
-  const itemCount = receipt.items.length;
-  const pairs = Math.floor(itemCount / 2);
+  // 4) +5 points for every 2 items
+  const pairs = Math.floor(receipt.items.length / 2);
   points += pairs * 5;
 
-  receipt.items.forEach(item => {
+  // 5) For each item, check if description length is multiple of 3 => add ceil(price*0.2)
+  for (const item of receipt.items) {
     const trimmedDesc = item.shortDescription.trim();
     if (trimmedDesc.length % 3 === 0) {
       const itemPrice = parseFloat(item.price);
       const bonus = Math.ceil(itemPrice * 0.2);
       points += bonus;
     }
-  });
+  }
 
-
-  const dateParts = receipt.purchaseDate.split('-').map(Number);
-  const day = dateParts[2];
+  // 6) +6 points if purchase day is odd
+  const [year, month, day] = receipt.purchaseDate.split('-').map(Number);
   if (day % 2 !== 0) {
     points += 6;
   }
 
-
-  const timeParts = receipt.purchaseTime.split(':').map(Number);
-  const hour = timeParts[0];
+  // 7) +10 points if hour is between 14..15 (2pm-3:59pm)
+  const [hour, minute] = receipt.purchaseTime.split(':').map(Number);
   if (hour >= 14 && hour < 16) {
     points += 10;
   }
@@ -50,16 +67,24 @@ export function calculatePoints(receipt: IReceipt): number {
   return points;
 }
 
+/**
+ * Processes the given receipt:
+ *  - Generates a unique ID
+ *  - Calculates points
+ *  - Stores data in memory
+ *  - Returns the generated ID
+ */
 export function processReceipt(receipt: IReceipt): string {
-  const id = randomUUID(); // e.g., "7fb1377b-b223-49d9-a31a-5a02701dd310"
+  const id = randomUUID();
   const points = calculatePoints(receipt);
-
   receiptStore.set(id, { receipt, points });
   return id;
 }
 
-
+/**
+ * Retrieves the points for a given receipt ID from the in-memory store.
+ * Returns undefined if not found.
+ */
 export function getPointsForReceipt(id: string): number | undefined {
-  const entry = receiptStore.get(id);
-  return entry?.points;
+  return receiptStore.get(id)?.points;
 }
