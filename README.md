@@ -7,7 +7,7 @@ A simple Node.js + TypeScript application that processes receipts, calculates po
 1. **Clone or Download** this repository:
    ```bash
    git clone https://github.com/Vishnuvardhan27/receipt-processor-api
-   cd receipt-processor
+   cd receipt-processor-api
    ```
 
 2. **Install Dependencies**:
